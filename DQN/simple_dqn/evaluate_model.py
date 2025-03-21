@@ -253,7 +253,7 @@ if __name__ == "__main__":
     env_path = "../FoodCollector1Agent_Win64/FoodCollector.exe"
     
     # Chemin vers le modèle entraîné
-    model_path = "checkpoints/model_final_1000epds.pth"
+    model_path = "checkpoints/model_final-15score.pth"
 
     
     # Si le modèle final n'existe pas, rechercher le dernier point de contrôle
@@ -269,4 +269,4 @@ if __name__ == "__main__":
             exit(1)
     
     # Évaluer le modèle
-    evaluate_model(env_path, model_path, num_episodes=5, render=True)
+    evaluate_model(env_path, model_path, num_episodes=2, render=True)
