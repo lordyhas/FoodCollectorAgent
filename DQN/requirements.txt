@@ -1,0 +1,7 @@
+# Dépendances pour l'environnement Unity ML-Agents
+mlagents-envs>=0.27.0
+numpy>=1.21.0
+
+# Dépendances pour l'agent DQN
+torch>=1.10.0
+matplotlib>=3.5.0 
