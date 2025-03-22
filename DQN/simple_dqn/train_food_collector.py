@@ -6,16 +6,14 @@ import os
 import warnings
 import logging
 from collections import deque
+from gru_dqn_agent import GRUDQNAgent, GRUQNetwork, device, LR
 from dqn_agent import DQNAgent
-
+import torch.optim as optim
+import uuid
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 from mlagents_envs.base_env import ActionTuple
-
-# Configurer les avertissements pour ignorer les messages du canal inconnu
-warnings.filterwarnings("ignore")
-# Alternative: rediriger les avertissements ML-Agents vers un niveau inférieur
-logging.getLogger("mlagents").setLevel(logging.ERROR)
+from mlagents_envs.side_channel import SideChannel
 
 # Définir des hyperparamètres d'entraînement
 NUM_EPISODES = 1000  # Nombre réduit pour les tests initiaux
@@ -23,10 +21,18 @@ MAX_STEPS = 1000  # Nombre maximal d'étapes par épisode
 EPS_START = 1.0  # Valeur initiale d'epsilon
 EPS_END = 0.01  # Valeur minimale d'epsilon
 EPS_DECAY = 0.995  # Facteur de décroissance d'epsilon
-TARGET_SCORE = 15  # Score moyen à atteindre pour considérer l'environnement résolu
+TARGET_SCORE = 17  # Score moyen à atteindre pour considérer l'environnement résolu
 
 
-def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_start=EPS_START,
+class CustomChannel(SideChannel):
+    def __init__(self):
+        super().__init__(uuid.UUID("a1d8f7b7-cec8-50f9-b78b-d3e165a78520"))
+
+    def on_message_received(self, msg: bytes) -> None:
+        pass
+
+
+def train_dqn(env_path, network_type='dqn', num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_start=EPS_START,
               eps_end=EPS_END, eps_decay=EPS_DECAY, target_score=TARGET_SCORE):
     """
     Entraîne un agent DQN dans l'environnement FoodCollector de Unity.
@@ -34,6 +40,7 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
     Params
     ======
         env_path (str): Chemin vers l'exécutable Unity
+        network_type (str): Type de réseau à utiliser ('dqn' ou 'gru')
         num_episodes (int): Nombre maximal d'épisodes d'entraînement
         max_steps (int): Nombre maximal d'étapes par épisode
         eps_start (float): Valeur initiale d'epsilon pour l'exploration
@@ -50,7 +57,7 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
 
     # Initialiser l'environnement Unity
     print(f"Démarrage de l'environnement Unity: {env_path}")
-    env = UnityEnvironment(file_name=env_path, side_channels=[channel], no_graphics=True)
+    env = UnityEnvironment(file_name=env_path, side_channels=[channel, CustomChannel()], no_graphics=True)
 
     # Définir la timescale pour accélérer l'entraînement
     channel.set_configuration_parameters(time_scale=2.0)
@@ -101,12 +108,19 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
     print(f"Taille de l'état: {state_size}, Taille de l'action: {action_size}")
 
     # Initialiser l'agent DQN
-    agent = DQNAgent(state_size=state_size, action_size=action_size, seed=42)
+    if network_type.lower() == 'gru':
+        print("Utilisation de l'agent GRU-DQN")
+        agent = GRUDQNAgent(state_size=state_size, action_size=action_size, seed=42)
+    else:
+        print("Utilisation de l'agent DQN standard")
+        agent = DQNAgent(state_size=state_size, action_size=action_size, seed=42)
 
     # Liste pour stocker les scores
     scores = []
     # Déque pour calculer la moyenne sur les 100 derniers épisodes
     scores_window = deque(maxlen=100)
+    # Liste pour stocker les pertes
+    losses = []
     # Epsilon pour l'exploration
     eps = eps_start
 
@@ -148,6 +162,8 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
 
         # Initialiser le score pour cet épisode
         score = 0
+        # Initialiser la perte pour cet épisode
+        episode_losses = []
 
         # Exécuter l'épisode
         for t in range(max_steps):
@@ -238,6 +254,10 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
             # Mettre à jour l'agent
             agent.step(state, action_idx, reward, next_state, done)
 
+            # Récupérer la perte si disponible (après apprentissage)
+            if hasattr(agent, 'last_loss') and agent.last_loss is not None:
+                episode_losses.append(agent.last_loss)
+
             # Mettre à jour l'état et le score
             state = next_state
             score += reward
@@ -252,6 +272,12 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
         scores_window.append(score)
         scores.append(score)
 
+        # Sauvegarder la perte moyenne de l'épisode
+        if episode_losses:
+            losses.append(np.mean(episode_losses))
+        else:
+            losses.append(0.0)  # Pas de perte si pas d'apprentissage
+
         # Afficher les statistiques
         print(f'\rÉpisode {i_episode}\tScore: {score:.2f}\tScore moyen: {np.mean(scores_window):.2f}', end="")
 
@@ -259,27 +285,28 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
         if i_episode % 100 == 0:
             print(f'\rÉpisode {i_episode}\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle
-            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/checkpoint_episode_{i_episode}.pth')
+            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/checkpoint_episode_{i_episode}-x.pth')
 
         # Vérifier si l'environnement est résolu
         if np.mean(scores_window) >= target_score:
             print(f'\nEnvironnement résolu en {i_episode} épisodes!\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle final
-            torch.save(agent.qnetwork_local.state_dict(), 'checkpoints/model_final-17m.pth')
+            torch.save(agent.qnetwork_local.state_dict(), 'checkpoints/model_final-2000x.pth')
             break
 
     # Fermer l'environnement
     env.close()
 
-    return scores
+    return scores, losses
 
 
-def plot_scores(scores):
-    """Affiche un graphique des scores pendant l'entraînement."""
+def plot_scores(scores, losses=None):
+    """Affiche un graphique des scores et optionnellement des pertes pendant l'entraînement."""
     # Créer un dossier pour les figures si nécessaire
     if not os.path.exists('figures'):
         os.makedirs('figures')
 
+    # Créer une figure pour les scores
     plt.figure(figsize=(10, 6))
     plt.plot(np.arange(len(scores)), scores)
     plt.ylabel('Score')
@@ -290,16 +317,42 @@ def plot_scores(scores):
     moving_avg = np.convolve(scores, np.ones((100,)) / 100, mode='valid')
     plt.plot(np.arange(len(moving_avg)), moving_avg, color='red')
 
-    plt.savefig('figures/scores_plot.png')
+    plt.savefig('figures/scores_plot-x.png')
     plt.show()
+
+    # Si des pertes sont disponibles, les tracer aussi
+    if losses is not None and len(losses) > 0:
+        plt.figure(figsize=(10, 6))
+        plt.plot(np.arange(len(losses)), losses)
+        plt.ylabel('Loss')
+        plt.xlabel('Épisode')
+        plt.title('Pertes pendant l\'entraînement DQN')
+
+        # Calculer la moyenne mobile sur 100 épisodes
+        if len(losses) >= 100:
+            moving_avg_loss = np.convolve(losses, np.ones((100,)) / 100, mode='valid')
+            plt.plot(np.arange(len(moving_avg_loss)), moving_avg_loss, color='red')
+
+        plt.savefig('figures/loss_plot-x.png')
+        plt.show()
 
 
 if __name__ == "__main__":
     # Chemin vers l'exécutable Unity
     env_path = "../FoodCollectorOneAgent/FoodCollector.exe"
+    start_time = time.time()
+    # Type de réseau à utiliser ('dqn' ou 'gru')
+    network_type = 'gru'  # Changer pour 'dqn' pour utiliser DQN standard
 
     # Entraîner l'agent
-    scores = train_dqn(env_path, num_episodes=1200, max_steps=1000)
+    scores, losses = train_dqn(
+        env_path,
+        network_type=network_type,
+        num_episodes=2000
+    )
 
     # Afficher les résultats
-    plot_scores(scores)
+    plot_scores(scores, losses)
+
+    end_time = time.time()
+    print(f"Temps d'exécution: {end_time - start_time:.2f} secondes")
