@@ -122,8 +122,8 @@ class DDPGAgent:
         self.soft_update(self.critic, self.target_critic)
 
         # Log dans TensorBoard
-        self.writer.add_scalar("Loss/Actor", actor_loss.item(), self.learn_steps)
-        self.writer.add_scalar("Loss/Critic", critic_loss.item(), self.learn_steps)
+        self.writer.add_scalar("Loss/Actor", actor_loss, self.learn_steps)
+        self.writer.add_scalar("Loss/Critic", critic_loss, self.learn_steps)
 
     def soft_update(self, local_model, target_model):
         for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):

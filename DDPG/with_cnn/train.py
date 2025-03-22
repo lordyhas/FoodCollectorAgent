@@ -100,6 +100,8 @@ def main():
                 state_img = next_state_img
 
             print(f"[Episode {episode}] reward={episode_reward:.2f}, steps={steps_count}")
+            # On loggue la reward épisode dans TensorBoard
+            agent.writer.add_scalar("Episode/Reward", episode_reward, episode)
     finally:
 
         env.close()
