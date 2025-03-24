@@ -269,8 +269,9 @@ if __name__ == "__main__":
     # env_path = "../FoodCollector1Agent_Win64/FoodCollector.exe"
     env_path = "../FoodCollectorOneAgent/FoodCollector.exe"
 
-    model_path = "checkpoints/model_final-15m.pth"
+    #model_path = "checkpoints/model_final-15m.pth"
     #model_path = "checkpoints/checkpoint_episode_700-gru.pth"
+    model_path = "checkpoints-finetune/finetuned_dqn_20250322-213144_final.pth"
 
     # Spécifier le type de réseau (dqn ou gru) en fonction du modèle utilisé pour l'entraînement
     network_type = 'dqn'  # 'dqn' pour un modèle DQN standard
