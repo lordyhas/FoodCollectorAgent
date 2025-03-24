@@ -21,7 +21,7 @@ MAX_STEPS = 1000  # Nombre maximal d'étapes par épisode
 EPS_START = 1.0  # Valeur initiale d'epsilon
 EPS_END = 0.01  # Valeur minimale d'epsilon
 EPS_DECAY = 0.995  # Facteur de décroissance d'epsilon
-TARGET_SCORE = 17  # Score moyen à atteindre pour considérer l'environnement résolu
+TARGET_SCORE = 15  # Score moyen à atteindre pour considérer l'environnement résolu
 
 
 class CustomChannel(SideChannel):
@@ -32,8 +32,8 @@ class CustomChannel(SideChannel):
         pass
 
 
-def train_dqn(env_path, network_type='dqn', num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_start=EPS_START,
-              eps_end=EPS_END, eps_decay=EPS_DECAY, target_score=TARGET_SCORE):
+def train_dqn(env_path, network_type='dnn', num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_start=EPS_START,
+              eps_end=EPS_END, eps_decay=EPS_DECAY, target_score=TARGET_SCORE, summary_writer=None, suffix=""):
     """
     Entraîne un agent DQN dans l'environnement FoodCollector de Unity.
 
@@ -60,7 +60,7 @@ def train_dqn(env_path, network_type='dqn', num_episodes=NUM_EPISODES, max_steps
     env = UnityEnvironment(file_name=env_path, side_channels=[channel, CustomChannel()], no_graphics=True)
 
     # Définir la timescale pour accélérer l'entraînement
-    channel.set_configuration_parameters(time_scale=2.0)
+    channel.set_configuration_parameters(time_scale=20.0)
 
     # Réinitialiser l'environnement
     env.reset()
@@ -285,13 +285,13 @@ def train_dqn(env_path, network_type='dqn', num_episodes=NUM_EPISODES, max_steps
         if i_episode % 100 == 0:
             print(f'\rÉpisode {i_episode}\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle
-            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/checkpoint_episode_{i_episode}-x.pth')
+            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/checkpoint_episode_{i_episode}-{network_type}.pth')
 
         # Vérifier si l'environnement est résolu
         if np.mean(scores_window) >= target_score:
             print(f'\nEnvironnement résolu en {i_episode} épisodes!\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle final
-            torch.save(agent.qnetwork_local.state_dict(), 'checkpoints/model_final-2000x.pth')
+            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/model_final-{network_type}-1000x.pth')
             break
 
     # Fermer l'environnement
@@ -311,13 +311,13 @@ def plot_scores(scores, losses=None):
     plt.plot(np.arange(len(scores)), scores)
     plt.ylabel('Score')
     plt.xlabel('Épisode')
-    plt.title('Scores pendant l\'entraînement DQN')
+    plt.title(f'Scores pendant l\'entraînement DQN - {network_type.upper()}')
 
     # Calculer la moyenne mobile sur 100 épisodes
     moving_avg = np.convolve(scores, np.ones((100,)) / 100, mode='valid')
     plt.plot(np.arange(len(moving_avg)), moving_avg, color='red')
 
-    plt.savefig('figures/scores_plot-x.png')
+    plt.savefig(f'figures/scores_plot-{network_type}.png')
     plt.show()
 
     # Si des pertes sont disponibles, les tracer aussi
@@ -326,14 +326,14 @@ def plot_scores(scores, losses=None):
         plt.plot(np.arange(len(losses)), losses)
         plt.ylabel('Loss')
         plt.xlabel('Épisode')
-        plt.title('Pertes pendant l\'entraînement DQN')
+        plt.title(f'Pertes pendant l\'entraînement DQN - {network_type.upper()}')
 
         # Calculer la moyenne mobile sur 100 épisodes
         if len(losses) >= 100:
             moving_avg_loss = np.convolve(losses, np.ones((100,)) / 100, mode='valid')
             plt.plot(np.arange(len(moving_avg_loss)), moving_avg_loss, color='red')
 
-        plt.savefig('figures/loss_plot-x.png')
+        plt.savefig(f'figures/loss_plot-{network_type}.png')
         plt.show()
 
 
@@ -348,7 +348,7 @@ if __name__ == "__main__":
     scores, losses = train_dqn(
         env_path,
         network_type=network_type,
-        num_episodes=2000
+        num_episodes=1000
     )
 
     # Afficher les résultats
