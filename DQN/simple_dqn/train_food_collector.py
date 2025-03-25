@@ -21,7 +21,7 @@ MAX_STEPS = 1000  # Nombre maximal d'étapes par épisode
 EPS_START = 1.0  # Valeur initiale d'epsilon
 EPS_END = 0.01  # Valeur minimale d'epsilon
 EPS_DECAY = 0.995  # Facteur de décroissance d'epsilon
-TARGET_SCORE = 15  # Score moyen à atteindre pour considérer l'environnement résolu
+TARGET_SCORE = 17  # Score moyen à atteindre pour considérer l'environnement résolu
 
 
 class CustomChannel(SideChannel):
@@ -60,7 +60,7 @@ def train_dqn(env_path, network_type='dnn', num_episodes=NUM_EPISODES, max_steps
     env = UnityEnvironment(file_name=env_path, side_channels=[channel, CustomChannel()], no_graphics=True)
 
     # Définir la timescale pour accélérer l'entraînement
-    channel.set_configuration_parameters(time_scale=20.0)
+    channel.set_configuration_parameters(time_scale=10.0)
 
     # Réinitialiser l'environnement
     env.reset()
@@ -285,13 +285,13 @@ def train_dqn(env_path, network_type='dnn', num_episodes=NUM_EPISODES, max_steps
         if i_episode % 100 == 0:
             print(f'\rÉpisode {i_episode}\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle
-            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/checkpoint_episode_{i_episode}-{network_type}.pth')
+            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/checkpoint_episode_{i_episode}-{network_type}{suffix}.pth')
 
         # Vérifier si l'environnement est résolu
         if np.mean(scores_window) >= target_score:
             print(f'\nEnvironnement résolu en {i_episode} épisodes!\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle final
-            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/model_final-{network_type}-1000x.pth')
+            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/model_final-{network_type}{suffix}.pth')
             break
 
     # Fermer l'environnement
@@ -308,15 +308,17 @@ def plot_scores(scores, losses=None):
 
     # Créer une figure pour les scores
     plt.figure(figsize=(10, 6))
-    plt.plot(np.arange(len(scores)), scores)
+    plt.plot(np.arange(len(scores)), scores, label='Score')
     plt.ylabel('Score')
     plt.xlabel('Épisode')
     plt.title(f'Scores pendant l\'entraînement DQN - {network_type.upper()}')
 
     # Calculer la moyenne mobile sur 100 épisodes
     moving_avg = np.convolve(scores, np.ones((100,)) / 100, mode='valid')
-    plt.plot(np.arange(len(moving_avg)), moving_avg, color='red')
-
+    plt.plot(np.arange(len(moving_avg)), moving_avg, color='red', label='Moyenne (100 épisodes)')
+    #TARGET_SCORE
+    plt.axhline(y=17, color='green', linestyle='--', alpha=0.3, label='Objectif')
+    plt.legend()
     plt.savefig(f'figures/scores_plot-{network_type}.png')
     plt.show()
 
@@ -331,10 +333,12 @@ def plot_scores(scores, losses=None):
         # Calculer la moyenne mobile sur 100 épisodes
         if len(losses) >= 100:
             moving_avg_loss = np.convolve(losses, np.ones((100,)) / 100, mode='valid')
-            plt.plot(np.arange(len(moving_avg_loss)), moving_avg_loss, color='red')
+            plt.plot(np.arange(len(moving_avg_loss)), moving_avg_loss, color='red', label='Moyenne (100 épisodes)')
 
         plt.savefig(f'figures/loss_plot-{network_type}.png')
         plt.show()
+
+
 
 
 if __name__ == "__main__":
@@ -342,13 +346,14 @@ if __name__ == "__main__":
     env_path = "../FoodCollectorOneAgent/FoodCollector.exe"
     start_time = time.time()
     # Type de réseau à utiliser ('dqn' ou 'gru')
-    network_type = 'gru'  # Changer pour 'dqn' pour utiliser DQN standard
+    network_type = 'dqn'  # Changer pour 'dqn' pour utiliser DQN standard
 
     # Entraîner l'agent
     scores, losses = train_dqn(
         env_path,
         network_type=network_type,
-        num_episodes=1000
+        num_episodes=1000,
+        suffix="_2"
     )
 
     # Afficher les résultats
