@@ -1,3 +1,5 @@
+import uuid
+
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -6,6 +8,9 @@ import os
 import warnings
 import logging
 from collections import deque
+
+from mlagents_envs.side_channel import SideChannel
+
 from dqn_agent import DQNAgent
 
 from mlagents_envs.environment import UnityEnvironment
@@ -26,6 +31,12 @@ EPS_START = 1.0          # Valeur initiale d'epsilon
 EPS_END = 0.01           # Valeur minimale d'epsilon
 EPS_DECAY = 0.995        # Facteur de décroissance d'epsilon
 TARGET_SCORE = 15        # Score moyen à atteindre pour considérer l'environnement résolu
+
+class CustomChannel(SideChannel):
+    def __init__(self):
+        super().__init__(uuid.UUID("a1d8f7b7-cec8-50f9-b78b-d3e165a78520"))
+    def on_message_received(self, msg: bytes) -> None:
+        pass
 
 def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_start=EPS_START, 
               eps_end=EPS_END, eps_decay=EPS_DECAY, target_score=TARGET_SCORE):
@@ -51,7 +62,7 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
     
     # Initialiser l'environnement Unity
     print(f"Démarrage de l'environnement Unity: {env_path}")
-    env = UnityEnvironment(file_name=env_path, side_channels=[channel], no_graphics=True)
+    env = UnityEnvironment(file_name=env_path, side_channels=[channel, CustomChannel()], no_graphics=True)
     
     # Définir la timescale pour accélérer l'entraînement
     channel.set_configuration_parameters(time_scale=20.0)
@@ -112,8 +123,8 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
     eps = eps_start
     
     # Créer un dossier pour sauvegarder les modèles
-    if not os.path.exists('checkpoints'):
-        os.makedirs('checkpoints')
+    if not os.path.exists('checkpoints1'):
+        os.makedirs('checkpoints1')
     
     # Début de l'entraînement
     print("Début de l'entraînement...")
@@ -153,7 +164,10 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
         # Exécuter l'épisode
         for t in range(max_steps):
             # Sélectionner une action
-            action_idx = agent.act(state, eps)
+            action_idx = agent.act(state,
+
+
+                                   )
             
             # Convertir l'action discrète en action compatible avec l'environnement
             if spec.action_spec.continuous_size > 0:
@@ -262,13 +276,13 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
         if i_episode % 100 == 0:
             print(f'\rÉpisode {i_episode}\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle
-            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/checkpoint_episode_{i_episode}.pth')
+            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints1/checkpoint_episode_{i_episode}.pth')
         
         # Vérifier si l'environnement est résolu
         if np.mean(scores_window) >= target_score:
             print(f'\nEnvironnement résolu en {i_episode} épisodes!\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle final
-            torch.save(agent.qnetwork_local.state_dict(), 'checkpoints/model_final-15score.pth')
+            torch.save(agent.qnetwork_local.state_dict(), 'checkpoints1/model_final-15score.pth')
             break
     
     # Fermer l'environnement

@@ -9,7 +9,6 @@ class ReplayBuffer:
         self.position = 0
 
     def push(self, state_img, action, reward, next_state_img, done):
-        # On stocke l'image state, l'action, la reward, la next image, le done
         if len(self.buffer) < self.capacity:
             self.buffer.append(None)
         self.buffer[self.position] = (state_img, action, reward, next_state_img, done)
@@ -18,7 +17,11 @@ class ReplayBuffer:
     def sample(self):
         batch = random.sample(self.buffer, k=self.batch_size)
         state_imgs, actions, rewards, next_imgs, dones = zip(*batch)
-        return np.array(state_imgs), np.array(actions), np.array(rewards), np.array(next_imgs), np.array(dones)
+        return (np.array(state_imgs),
+                np.array(actions),
+                np.array(rewards),
+                np.array(next_imgs),
+                np.array(dones))
 
     def __len__(self):
         return len(self.buffer)

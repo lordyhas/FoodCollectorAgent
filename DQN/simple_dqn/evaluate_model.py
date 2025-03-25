@@ -253,16 +253,16 @@ if __name__ == "__main__":
     env_path = "../FoodCollector1Agent_Win64/FoodCollector.exe"
     
     # Chemin vers le modèle entraîné
-    model_path = "checkpoints/model_final-15score.pth"
+    model_path = "checkpoints1/model_final-15score.pth"
 
     
     # Si le modèle final n'existe pas, rechercher le dernier point de contrôle
     if not os.path.exists(model_path):
-        checkpoint_files = [f for f in os.listdir("checkpoints") if f.startswith("checkpoint_episode_")]
+        checkpoint_files = [f for f in os.listdir("checkpoints1") if f.startswith("checkpoint_episode_")]
         if checkpoint_files:
             # Trier les fichiers par numéro d'épisode
             checkpoint_files.sort(key=lambda f: int(f.split("_")[2].split(".")[0]))
-            model_path = os.path.join("checkpoints", checkpoint_files[-1])
+            model_path = os.path.join("checkpoints1", checkpoint_files[-1])
             print(f"Modèle final non trouvé, utilisation du dernier point de contrôle: {model_path}")
         else:
             print("Aucun modèle trouvé. Veuillez d'abord entraîner un agent.")

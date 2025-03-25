@@ -111,8 +111,8 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
     eps = eps_start
 
     # Créer un dossier pour sauvegarder les modèles
-    if not os.path.exists('checkpoints'):
-        os.makedirs('checkpoints')
+    if not os.path.exists('checkpoints1'):
+        os.makedirs('checkpoints1')
 
     # Début de l'entraînement
     print("Début de l'entraînement...")
@@ -259,13 +259,13 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
         if i_episode % 100 == 0:
             print(f'\rÉpisode {i_episode}\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle
-            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/checkpoint_episode_{i_episode}.pth')
+            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints1/checkpoint_episode_{i_episode}.pth')
 
         # Vérifier si l'environnement est résolu
         if np.mean(scores_window) >= target_score:
             print(f'\nEnvironnement résolu en {i_episode} épisodes!\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle final
-            torch.save(agent.qnetwork_local.state_dict(), 'checkpoints/model_final-17m.pth')
+            torch.save(agent.qnetwork_local.state_dict(), 'checkpoints1/model_final-17m.pth')
             break
 
     # Fermer l'environnement
