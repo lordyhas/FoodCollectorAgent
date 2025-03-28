@@ -16,7 +16,8 @@ class DDPGAgent:
                  gamma=0.99,
                  tau=1e-3,
                  buffer_size=int(1e5),
-                 batch_size=64,
+                 # batch_size=64,
+                 batch_size=32,
                  device="cpu"):
         self.gamma = gamma
         self.tau = tau
@@ -79,6 +80,7 @@ class DDPGAgent:
         self.noise_scale = max(self.noise_min, self.noise_scale*self.noise_decay)
 
         if len(self.memory) > self.batch_size:
+            # print(f"Learning at step {self.learn_steps}")
             self.learn()
 
     def learn(self):
