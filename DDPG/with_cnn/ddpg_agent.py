@@ -2,6 +2,8 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
+import matplotlib.pyplot as plt
+import datetime
 from torch.utils.tensorboard import SummaryWriter
 
 from networks import ActorCNN, CriticCNN
@@ -24,7 +26,8 @@ class DDPGAgent:
         self.batch_size = batch_size
 
         self.device = torch.device(device)
-        self.writer = SummaryWriter(log_dir="runs/ddpg_cnn")  # logs TensorBoard
+        self.loss_writer = SummaryWriter(log_dir="runs/loss")  # logs TensorBoard
+        self.rewards_writer = SummaryWriter(log_dir="runs/rewards")  # logs TensorBoard
 
         # Réseaux
         self.actor = ActorCNN(in_channels, action_dim).to(self.device)
@@ -51,6 +54,13 @@ class DDPGAgent:
         self.noise_min = 0.1
 
         self.learn_steps = 0
+
+        self.critic_losses = []
+        self.actor_losses = []
+        self.mean_critic_losses = []
+        self.mean_actor_losses = []
+        self.rewards = []
+        self.mean_rewards = []
 
     def act(self, state_img, add_noise=True):
         """
@@ -109,7 +119,8 @@ class DDPGAgent:
 
         # --- Actor update ---
         predicted_actions = self.actor(state_imgs_t)
-        actor_loss = -self.critic(state_imgs_t, predicted_actions).mean()
+        # actor_loss = -self.critic(state_imgs_t, predicted_actions).mean()
+        actor_loss = self.critic(state_imgs_t, predicted_actions).mean()
 
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
@@ -120,8 +131,58 @@ class DDPGAgent:
         self.soft_update(self.critic, self.target_critic)
 
         # Log dans TensorBoard
-        self.writer.add_scalar("Loss/Critic", critic_loss.item(), self.learn_steps)
-        self.writer.add_scalar("Loss/Actor", actor_loss.item(), self.learn_steps)
+        self.loss_writer.add_scalar("Loss/Critic", critic_loss.item(), self.learn_steps)
+        self.loss_writer.add_scalar("Loss/Actor", actor_loss.item(), self.learn_steps)
+
+        # Store the losses in lists
+        self.critic_losses.append(critic_loss.item())
+        self.actor_losses.append(actor_loss.item())
+
+        # Store the mean losses in lists
+        self.mean_critic_losses.append(np.mean(self.critic_losses))
+        self.mean_actor_losses.append(np.mean(self.actor_losses))
+
+    def plot_and_save_losses(self, max_episodes, max_steps):
+        fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+
+        # Plot Critic Loss
+        axs[0].plot(self.critic_losses, label='Critic Loss')
+        # critic_mean = np.mean(self.critic_losses)
+        axs[0].plot(self.mean_critic_losses, color='red', linestyle='--', label=f'Mean Critic Loss')
+        axs[0].set_xlabel('Learning Steps')
+        axs[0].set_ylabel('Loss')
+        axs[0].legend()
+        axs[0].set_title('Critic Loss Curve')
+
+        # Plot Actor Loss
+        axs[1].plot(self.actor_losses, label='Actor Loss')
+        # actor_mean = np.mean(self.actor_losses)
+        axs[1].plot(self.mean_actor_losses, color='red', linestyle='--', label=f'Mean Actor Loss')
+        axs[1].set_xlabel('Learning Steps')
+        axs[1].set_ylabel('Loss')
+        axs[1].legend()
+        axs[1].set_title('Actor Loss Curve')
+
+        plt.tight_layout()
+
+        current_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+        plt.savefig(f"figures_results/{current_date}_ddpg_cnn_loss_curves_{max_episodes}_{max_steps}.png")
+        plt.show()
+
+    def plot_and_save_rewards(self, max_episodes):
+        plt.figure()
+        plt.plot(self.rewards, label='Episode Reward')
+        plt.plot(self.mean_rewards, color='red', linestyle='--', label=f'Mean Actor Loss')
+
+        plt.xlabel('Episode')
+        plt.ylabel('Reward')
+        plt.legend()
+        plt.title('Rewards Curve')
+
+        current_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        plt.savefig(f"figures_results/{current_date}_ddpg_cnn_rewards_curve_{max_episodes}.png")
+        plt.show()
 
     def soft_update(self, local_model, target_model):
         for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):

@@ -8,6 +8,8 @@ from mlagents_envs.side_channel import SideChannel
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 
 from ddpg_agent import DDPGAgent
+from torch.utils.tensorboard import SummaryWriter
+
 
 class CustomChannel(SideChannel):
     def __init__(self):
@@ -39,12 +41,10 @@ def main():
         # 2) Créer l'agent DDPG CNN
         agent = DDPGAgent(in_channels=5, action_dim=3, device="cuda" if torch.cuda.is_available() else "cpu")
 
-        max_episodes = 100
+        max_episodes = 5
         max_steps = 100
 
-        # Pour logger la reward dans TensorBoard, on utilise l'agent.writer
-        from torch.utils.tensorboard import SummaryWriter
-        writer = agent.writer  # on réutilise le SummaryWriter existant
+        writer = agent.rewards_writer
 
         for episode in range(max_episodes):
             env.reset()
@@ -102,12 +102,20 @@ def main():
                 obs_img = next_obs_img
 
             # Fin d'épisode
+            max_steps = max(max_steps, steps_count)
             print(f"[Episode {episode}] reward={episode_reward:.2f}, steps={steps_count}")
             writer.add_scalar("EpisodeReward", episode_reward, episode)
+            agent.rewards.append(episode_reward)
+            agent.mean_rewards.append(np.mean(agent.rewards))
+
+
+
     finally:
 
         env.close()
         print("Entraînement DDPG CNN terminé.")
+        agent.plot_and_save_rewards(max_episodes)
+        agent.plot_and_save_losses(max_episodes, max_steps)
 
 if __name__ == "__main__":
     main()
