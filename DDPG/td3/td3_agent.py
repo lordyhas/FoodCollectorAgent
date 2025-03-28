@@ -3,8 +3,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 
-from .networks import Actor, TwinCritics
-from .replay_buffer import ReplayBuffer
+from networks import Actor, TwinCritics
+from replay_buffer import ReplayBuffer
 
 class TD3Agent:
     def __init__(self,

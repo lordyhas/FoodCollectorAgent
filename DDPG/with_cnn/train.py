@@ -6,6 +6,7 @@ from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.base_env import ActionTuple
 from mlagents_envs.side_channel import SideChannel
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
+from tqdm import tqdm
 
 from ddpg_agent import DDPGAgent
 from torch.utils.tensorboard import SummaryWriter
@@ -41,12 +42,12 @@ def main():
         # 2) Créer l'agent DDPG CNN
         agent = DDPGAgent(in_channels=5, action_dim=3, device="cuda" if torch.cuda.is_available() else "cpu")
 
-        max_episodes = 5
+        max_episodes = 1000
         max_steps = 100
 
         writer = agent.rewards_writer
 
-        for episode in range(max_episodes):
+        for episode in tqdm(range(max_episodes), desc="Training"):
             env.reset()
             decision_steps, terminal_steps = env.get_steps(behavior_name)
 
@@ -103,7 +104,7 @@ def main():
 
             # Fin d'épisode
             max_steps = max(max_steps, steps_count)
-            print(f"[Episode {episode}] reward={episode_reward:.2f}, steps={steps_count}")
+            # print(f"[Episode {episode}] reward={episode_reward:.2f}, steps={steps_count}")
             writer.add_scalar("EpisodeReward", episode_reward, episode)
             agent.rewards.append(episode_reward)
             agent.mean_rewards.append(np.mean(agent.rewards))

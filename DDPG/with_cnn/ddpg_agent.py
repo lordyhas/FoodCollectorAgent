@@ -123,6 +123,7 @@ class DDPGAgent:
         actor_loss = self.critic(state_imgs_t, predicted_actions).mean()
 
         self.actor_optimizer.zero_grad()
+
         actor_loss.backward()
         self.actor_optimizer.step()
 
@@ -168,7 +169,7 @@ class DDPGAgent:
         current_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
         plt.savefig(f"figures_results/{current_date}_ddpg_cnn_loss_curves_{max_episodes}_{max_steps}.png")
-        plt.show()
+        # plt.show()
 
     def plot_and_save_rewards(self, max_episodes):
         plt.figure()
@@ -182,7 +183,7 @@ class DDPGAgent:
 
         current_date = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         plt.savefig(f"figures_results/{current_date}_ddpg_cnn_rewards_curve_{max_episodes}.png")
-        plt.show()
+        # plt.show()
 
     def soft_update(self, local_model, target_model):
         for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
