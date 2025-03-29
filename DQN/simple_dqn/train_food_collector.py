@@ -6,16 +6,15 @@ import os
 import warnings
 import logging
 from collections import deque
+from gru_dqn_agent import GRUDQNAgent, GRUQNetwork
 from dqn_agent import DQNAgent
-
+from lstm_dqn_agent import LSTMDQNAgent, LSTMQNetwork
+import torch.optim as optim
+import uuid
 from mlagents_envs.environment import UnityEnvironment
 from mlagents_envs.side_channel.engine_configuration_channel import EngineConfigurationChannel
 from mlagents_envs.base_env import ActionTuple
-
-# Configurer les avertissements pour ignorer les messages du canal inconnu
-warnings.filterwarnings("ignore")
-# Alternative: rediriger les avertissements ML-Agents vers un niveau inférieur
-logging.getLogger("mlagents").setLevel(logging.ERROR)
+from mlagents_envs.side_channel import SideChannel
 
 # Définir des hyperparamètres d'entraînement
 NUM_EPISODES = 1000  # Nombre réduit pour les tests initiaux
@@ -24,22 +23,33 @@ EPS_START = 1.0  # Valeur initiale d'epsilon
 EPS_END = 0.01  # Valeur minimale d'epsilon
 EPS_DECAY = 0.995  # Facteur de décroissance d'epsilon
 TARGET_SCORE = 15  # Score moyen à atteindre pour considérer l'environnement résolu
+TIME_SCALE = 10.0  # Vitesse de simulation (5x est plus stable que 20x)
 
 
-def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_start=EPS_START,
-              eps_end=EPS_END, eps_decay=EPS_DECAY, target_score=TARGET_SCORE):
+class CustomChannel(SideChannel):
+    def __init__(self):
+        super().__init__(uuid.UUID("a1d8f7b7-cec8-50f9-b78b-d3e165a78520"))
+
+    def on_message_received(self, msg: bytes) -> None:
+        pass
+
+
+def train_dqn(env_path, network_type='dqn', num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_start=EPS_START,
+              eps_end=EPS_END, eps_decay=EPS_DECAY, target_score=TARGET_SCORE, time_scale=TIME_SCALE, suffix=""):
     """
     Entraîne un agent DQN dans l'environnement FoodCollector de Unity.
 
     Params
     ======
         env_path (str): Chemin vers l'exécutable Unity
+        network_type (str): Type de réseau à utiliser ('dqn', 'gru' ou 'lstm')
         num_episodes (int): Nombre maximal d'épisodes d'entraînement
         max_steps (int): Nombre maximal d'étapes par épisode
         eps_start (float): Valeur initiale d'epsilon pour l'exploration
         eps_end (float): Valeur minimale d'epsilon
         eps_decay (float): Facteur de décroissance d'epsilon
         target_score (float): Score moyen à atteindre pour considérer l'entraînement réussi
+        time_scale (float): Vitesse de simulation Unity (1.0 = temps réel)
 
     Returns
     ======
@@ -50,10 +60,12 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
 
     # Initialiser l'environnement Unity
     print(f"Démarrage de l'environnement Unity: {env_path}")
-    env = UnityEnvironment(file_name=env_path, side_channels=[channel], no_graphics=True)
+    env = UnityEnvironment(file_name=env_path, side_channels=[channel, CustomChannel()], no_graphics=True)
 
     # Définir la timescale pour accélérer l'entraînement
-    channel.set_configuration_parameters(time_scale=2.0)
+    channel.set_configuration_parameters(time_scale=time_scale)
+
+    print(f"Utilisation de l'appareil: {'cuda' if torch.cuda.is_available() else 'cpu'}")
 
     # Réinitialiser l'environnement
     env.reset()
@@ -100,19 +112,32 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
 
     print(f"Taille de l'état: {state_size}, Taille de l'action: {action_size}")
 
-    # Initialiser l'agent DQN
-    agent = DQNAgent(state_size=state_size, action_size=action_size, seed=42)
+    # Initialiser l'agent selon le type de réseau
+    if network_type.lower() == 'gru':
+        print("Utilisation de l'agent GRU-DQN")
+        agent = GRUDQNAgent(state_size=state_size, action_size=action_size, seed=42)
+    elif network_type.lower() == 'lstm':
+        print("Utilisation de l'agent LSTM-DQN")
+        agent = LSTMDQNAgent(state_size=state_size, action_size=action_size, seed=42)
+    else:
+        print("Utilisation de l'agent DQN standard")
+        agent = DQNAgent(state_size=state_size, action_size=action_size, seed=42)
 
     # Liste pour stocker les scores
     scores = []
     # Déque pour calculer la moyenne sur les 100 derniers épisodes
     scores_window = deque(maxlen=100)
+    # Liste pour stocker les pertes
+    losses = []
     # Epsilon pour l'exploration
     eps = eps_start
 
     # Créer un dossier pour sauvegarder les modèles
-    if not os.path.exists('checkpoints1'):
-        os.makedirs('checkpoints1')
+    if not os.path.exists('checkpoints'):
+        os.makedirs('checkpoints')
+
+    # Obtenir le timestamp pour les noms de fichier
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
 
     # Début de l'entraînement
     print("Début de l'entraînement...")
@@ -127,8 +152,6 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
         if num_agents == 0:
             print("Aucun agent disponible. Vérifiez l'environnement Unity.")
             break
-
-        print(f"Nombre d'agents: {num_agents}")
 
         # Pour simplifier, nous entraînons avec le premier agent mais envoyons des actions à tous
         agent_id = agent_ids[0]
@@ -148,6 +171,8 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
 
         # Initialiser le score pour cet épisode
         score = 0
+        # Initialiser la perte pour cet épisode
+        episode_losses = []
 
         # Exécuter l'épisode
         for t in range(max_steps):
@@ -238,6 +263,10 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
             # Mettre à jour l'agent
             agent.step(state, action_idx, reward, next_state, done)
 
+            # Récupérer la perte si disponible (après apprentissage)
+            if hasattr(agent, 'last_loss') and agent.last_loss is not None:
+                episode_losses.append(agent.last_loss)
+
             # Mettre à jour l'état et le score
             state = next_state
             score += reward
@@ -252,6 +281,12 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
         scores_window.append(score)
         scores.append(score)
 
+        # Sauvegarder la perte moyenne de l'épisode
+        if episode_losses:
+            losses.append(np.mean(episode_losses))
+        else:
+            losses.append(0.0)  # Pas de perte si pas d'apprentissage
+
         # Afficher les statistiques
         print(f'\rÉpisode {i_episode}\tScore: {score:.2f}\tScore moyen: {np.mean(scores_window):.2f}', end="")
 
@@ -259,47 +294,118 @@ def train_dqn(env_path, num_episodes=NUM_EPISODES, max_steps=MAX_STEPS, eps_star
         if i_episode % 100 == 0:
             print(f'\rÉpisode {i_episode}\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle
-            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints1/checkpoint_episode_{i_episode}.pth')
+            torch.save(agent.qnetwork_local.state_dict(),
+                       f'checkpoints/{network_type}_checkpoint_episode_{i_episode}_{timestamp}.pth')
 
         # Vérifier si l'environnement est résolu
         if np.mean(scores_window) >= target_score:
             print(f'\nEnvironnement résolu en {i_episode} épisodes!\tScore moyen: {np.mean(scores_window):.2f}')
             # Sauvegarder le modèle final
-            torch.save(agent.qnetwork_local.state_dict(), 'checkpoints1/model_final-17m.pth')
+            torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/{network_type}_model_final_{timestamp}-{suffix}.pth')
             break
 
     # Fermer l'environnement
     env.close()
 
-    return scores
+    # Sauvegarder le modèle final si non déjà sauvegardé
+    if len(scores) >= num_episodes:
+        torch.save(agent.qnetwork_local.state_dict(), f'checkpoints/saved-{network_type}_model_final_{timestamp}-{suffix}.pth')
+
+    return scores, losses
 
 
-def plot_scores(scores):
-    """Affiche un graphique des scores pendant l'entraînement."""
+def plot_scores(scores, losses=None, network_type='dqn'):
+    """Affiche un graphique des scores et optionnellement des pertes pendant l'entraînement.
+
+    Params
+    ======
+        scores (list): Liste des scores par épisode
+        losses (list): Liste des pertes par épisode
+        network_type (str): Type de réseau utilisé ('dqn', 'gru' ou 'lstm')
+    """
     # Créer un dossier pour les figures si nécessaire
     if not os.path.exists('figures'):
         os.makedirs('figures')
 
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+
+    # Obtenir le titre adapté au type de réseau
+    if network_type.lower() == 'gru':
+        title_prefix = 'GRU-DQN'
+    elif network_type.lower() == 'lstm':
+        title_prefix = 'LSTM-DQN'
+    else:
+        title_prefix = 'DQN'
+
+    # Créer une figure pour les scores
     plt.figure(figsize=(10, 6))
     plt.plot(np.arange(len(scores)), scores)
     plt.ylabel('Score')
     plt.xlabel('Épisode')
-    plt.title('Scores pendant l\'entraînement DQN')
+    plt.title(f'Scores pendant l\'entraînement {title_prefix}')
 
-    # Calculer la moyenne mobile sur 100 épisodes
-    moving_avg = np.convolve(scores, np.ones((100,)) / 100, mode='valid')
-    plt.plot(np.arange(len(moving_avg)), moving_avg, color='red')
+    # Calculer la moyenne mobile sur 100 épisodes (ou moins si moins d'épisodes)
+    window_size = min(100, len(scores))
+    if window_size > 0:
+        moving_avg = np.convolve(scores, np.ones((window_size,)) / window_size, mode='valid')
+        plt.plot(np.arange(len(moving_avg)), moving_avg, color='red')
 
-    plt.savefig('figures/scores_plot.png')
+    plt.savefig(f'figures/{network_type}_scores_plot_{timestamp}.png')
     plt.show()
+
+    # Si des pertes sont disponibles, les tracer aussi
+    if losses is not None and len(losses) > 0:
+        plt.figure(figsize=(10, 6))
+        plt.plot(np.arange(len(losses)), losses)
+        plt.ylabel('Loss')
+        plt.xlabel('Épisode')
+        plt.title(f'Pertes pendant l\'entraînement {title_prefix}')
+
+        # Calculer la moyenne mobile sur 100 épisodes (ou moins si moins d'épisodes)
+        window_size = min(100, len(losses))
+        if window_size > 0:
+            moving_avg_loss = np.convolve(losses, np.ones((window_size,)) / window_size, mode='valid')
+            plt.plot(np.arange(len(moving_avg_loss)), moving_avg_loss, color='red')
+
+        plt.savefig(f'figures/{network_type}_loss_plot_{timestamp}.png')
+        plt.show()
 
 
 if __name__ == "__main__":
     # Chemin vers l'exécutable Unity
     env_path = "../FoodCollectorOneAgent/FoodCollector.exe"
+    start_time = time.time()
+
+    # Type de réseau à utiliser ('dqn', 'gru' ou 'lstm')
+    network_type = 'dqn'  # Changer pour 'gru' ou 'lstm'
+
+    print(f"Entraînement d'un agent {network_type.upper()} pour le collecteur de nourriture")
 
     # Entraîner l'agent
-    scores = train_dqn(env_path, num_episodes=1200, max_steps=1000)
+    scores, losses = train_dqn(
+        env_path,
+        network_type=network_type,
+        num_episodes=1000,
+        time_scale=20.0,
+        suffix="v3"
+    )
 
     # Afficher les résultats
-    plot_scores(scores)
+
+    end_time = time.time()
+    execution_time = end_time - start_time
+
+    if execution_time > 3600:
+        hours = execution_time // 3600
+        minutes = (execution_time % 3600) // 60
+        seconds = execution_time % 60
+        print(f"Temps d'exécution: {hours:.0f}h{minutes:.0f}minutes {seconds:.0f} secondes")
+    elif execution_time > 60:
+        minutes = execution_time // 60
+        seconds = execution_time % 60
+        print(f"Temps d'exécution: {minutes:.0f} minutes {seconds:.0f} secondes")
+    else:
+        print(f"Temps d'exécution: {execution_time:.2f} secondes")
+
+    plot_scores(scores, losses, network_type)
+
