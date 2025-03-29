@@ -151,7 +151,7 @@ class DQNAgent:
         """
         states, actions, rewards, next_states, dones, indices, weights = experiences
 
-        # Double DQN
+
         next_actions = self.qnetwork_local(next_states).detach().max(1)[1].unsqueeze(1)
         Q_targets_next = self.qnetwork_target(next_states).detach().gather(1, next_actions)
 
