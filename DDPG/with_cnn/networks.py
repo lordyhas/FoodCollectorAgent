@@ -17,6 +17,15 @@ class ActorCNN(nn.Module):
         self.fc1 = nn.Linear(64, 256)
         self.fc2 = nn.Linear(256, action_dim)
 
+        # Initialisation des poids avec He
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+            module.bias.data.fill_(0.01)
+
+
     def forward(self, x):
         # x: (batch,5,40,40)
         x = F.relu(self.conv1(x))  # => (batch,32,9,9)
@@ -43,6 +52,13 @@ class CriticCNN(nn.Module):
         self.fc1 = nn.Linear(64+action_dim, 256)
         self.fc2 = nn.Linear(256, 1)
 
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            nn.init.kaiming_normal_(module.weight, mode='fan_in', nonlinearity='relu')
+            module.bias.data.fill_(0.01)
+
     def forward(self, state_img, action):
         # state_img: (batch,5,40,40)
         s = F.relu(self.conv1(state_img))
@@ -53,3 +69,5 @@ class CriticCNN(nn.Module):
         x = torch.cat([s, action], dim=1)  # => (batch,67)
         x = F.relu(self.fc1(x))            # => (batch,256)
         return self.fc2(x)                 # => (batch,1)
+
+

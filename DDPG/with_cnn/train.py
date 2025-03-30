@@ -79,7 +79,7 @@ def main():
 
                 decision_steps, terminal_steps = env.get_steps(behavior_name)
 
-                # reward = 0.0
+                reward = 0.0
                 next_obs_img = obs_img
                 done = False
 
@@ -104,7 +104,7 @@ def main():
 
             # Fin d'épisode
             max_steps = max(max_steps, steps_count)
-            # print(f"[Episode {episode}] reward={episode_reward:.2f}, steps={steps_count}")
+            print(f"[Episode {episode}] reward={episode_reward:.2f}, steps={steps_count}")
             writer.add_scalar("EpisodeReward", episode_reward, episode)
             agent.rewards.append(episode_reward)
             agent.mean_rewards.append(np.mean(agent.rewards))
