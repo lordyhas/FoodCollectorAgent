@@ -18,7 +18,7 @@ def main():
     # 1) Lance l'env Unity
     config_channel = EngineConfigurationChannel()
     env = UnityEnvironment(
-        file_name="../environment/GridFoodCollector.exe",
+        file_name="../../environment/GridFoodCollector.exe",
         side_channels=[config_channel, CustomChannel()],
         seed=0,
         no_graphics=True,

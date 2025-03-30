@@ -45,7 +45,7 @@ def main():
 
     writer = agent.rewards_writer
 
-    for episode in tqdm(range(max_episodes), desc="Training"):
+    for episode in range(max_episodes):
         env.reset()
         decision_steps, terminal_steps = env.get_steps(behavior_name)
 
@@ -56,12 +56,12 @@ def main():
         # Récup obs init
         if len(decision_steps) > 0:
             obs_img = decision_steps.obs[0][0]  # => shape(5,40,40)
+
         else:
             obs_img = np.zeros((5, 40, 40), dtype=np.float32)
             done = True
 
-        # while not done and steps_count < max_steps:
-        while not done:
+        while not done and steps_count < max_steps:
             steps_count += 1
 
             # Sélection action
@@ -107,14 +107,12 @@ def main():
         agent.rewards.append(episode_reward)
         agent.mean_rewards.append(np.mean(agent.rewards))
 
-
-
-        env.close()
-        agent.rewards_writer.close()
-        agent.loss_writer.close()
-        print("Entraînement DDPG CNN terminé.")
-        agent.plot_and_save_rewards(max_episodes)
-        agent.plot_and_save_losses(max_episodes, max_steps)
+    env.close()
+    agent.rewards_writer.close()
+    agent.loss_writer.close()
+    print("Entraînement DDPG CNN terminé.")
+    agent.plot_and_save_rewards(max_episodes)
+    agent.plot_and_save_losses(max_episodes, max_steps)
 
 
 

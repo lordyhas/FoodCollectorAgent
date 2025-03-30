@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# --- Twin Critic Network ---
+#  Twin Critic Network
 class TwinCritic(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_size=256):
         super(TwinCritic, self).__init__()
@@ -16,7 +16,7 @@ class TwinCritic(nn.Module):
         self.q2_out = nn.Linear(hidden_size, 1)
 
     def forward(self, state, action):
-        # Concaténer état et action
+        # On Concatene état et action
         xu = torch.cat([state, action], dim=1)
         # Critic 1
         x1 = F.relu(self.fc1_1(xu))
@@ -29,7 +29,7 @@ class TwinCritic(nn.Module):
         return q1, q2
 
 
-# --- Actor Network ---
+#  Actor Network
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_size=256):
         super(Actor, self).__init__()
@@ -40,6 +40,5 @@ class Actor(nn.Module):
     def forward(self, state):
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
-        # Utiliser tanh pour borner l'action dans [-1,1]
         x = torch.tanh(self.fc3(x))
         return x

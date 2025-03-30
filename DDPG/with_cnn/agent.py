@@ -128,8 +128,7 @@ class DDPGAgent:
 
 
         q_expected = self.critic(state_imgs_t, actions_t)
-
-        critic_loss = F.smooth_l1_loss(q_expected, q_target)
+        critic_loss = F.mse_loss(q_expected, q_target)
 
         # Huber loss pour la robustesse
         # critic_loss = F.smooth_l1_loss(q_expected * weights, q_target * weights)
