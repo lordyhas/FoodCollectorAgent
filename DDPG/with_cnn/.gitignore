@@ -1,4 +1,2 @@
-.ipynb_checkpoints
-/.venv
-/.idea/
-__pycache__/
+
+runs/loss
