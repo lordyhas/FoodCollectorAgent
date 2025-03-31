@@ -16,7 +16,7 @@ UPDATE_EVERY = 4
 
 # Déterminer si un GPU est disponible
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-#print(f"Utilisation de l'appareil: {device}")
+print(f"Utilisation de l'appareil: {device}")
 
 
 class QNetwork(nn.Module):
@@ -66,6 +66,37 @@ class QNetwork(nn.Module):
         return self.fc4(x)
 
 
+class NStepBuffer:
+    """Buffer pour stocker et calculer les retours n-step."""
+
+    def __init__(self, n_step=3, gamma=0.99):
+        self.n_step = n_step
+        self.gamma = gamma
+        self.buffer = deque(maxlen=n_step)
+
+    def append(self, experience):
+        self.buffer.append(experience)
+
+    def get_n_step_info(self):
+        if len(self.buffer) < self.n_step:
+            return None
+
+        # Récupérer l'état initial et l'action
+        state = self.buffer[0].state
+        action = self.buffer[0].action
+
+        # Calculer la récompense n-step avec discount
+        n_step_reward = 0
+        for i in range(self.n_step):
+            n_step_reward += (self.gamma ** i) * self.buffer[i].reward
+
+        # État final et done après n steps
+        next_state = self.buffer[-1].next_state
+        done = self.buffer[-1].done
+
+        return (state, action, n_step_reward, next_state, done)
+
+
 class DQNAgent:
     """Agent implémentant l'algorithme Deep Q-Learning."""
 
@@ -108,15 +139,33 @@ class DQNAgent:
         self.eps_threshold = 0.5  # Seuil pour ajuster epsilon
         self.performance_window = deque(maxlen=100)
 
-    def step(self, state, action, reward, next_state, done):
-        # Sauvegarder l'expérience dans la replay memory
-        self.memory.add(state, action, reward, next_state, done)
+        # Ajouter après l'initialisation de performance_window
+        self.n_step = 3  # Nombre de steps pour le n-step return
+        self.n_step_buffer = NStepBuffer(n_step=self.n_step, gamma=GAMMA)
 
-        # Apprentissage à chaque UPDATE_EVERY pas de temps
+    def step(self, state, action, reward, next_state, done):
+        # Stocker l'expérience dans le n-step buffer
+        experience = self.memory.experience(state, action, reward, next_state, done)
+        self.n_step_buffer.append(experience)
+
+        # Obtenir l'expérience n-step si disponible
+        n_step_info = self.n_step_buffer.get_n_step_info()
+        if n_step_info is not None:
+            self.memory.add(*n_step_info)
+
+        # Si l'épisode est terminé, vider le buffer n-step
+        if done:
+            while len(self.n_step_buffer.buffer) > 0:
+                self.n_step_buffer.buffer.popleft()
+                n_step_info = self.n_step_buffer.get_n_step_info()
+                if n_step_info is not None:
+                    self.memory.add(*n_step_info)
+
+        # Apprentissage comme avant mais avec gamma ajusté
         self.t_step = (self.t_step + 1) % UPDATE_EVERY
         if self.t_step == 0 and len(self.memory) > BATCH_SIZE:
             experiences = self.memory.sample()
-            self.learn(experiences, GAMMA)
+            self.learn(experiences, GAMMA ** self.n_step)
 
     def act(self, state, eps=None):
         """Retourne l'action à prendre en fonction de l'état actuel, suivant la politique actuelle.
@@ -141,25 +190,17 @@ class DQNAgent:
         else:
             return random.choice(np.arange(self.action_size))
 
-    def learn(self, experiences, gamma):
-        """Mettre à jour les paramètres du réseau de valeurs en utilisant un batch d'expériences.
-
-        Params
-        ======
-            experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done)
-            gamma (float): facteur de remise
-        """
+    def learn(self, experiences, n_step_gamma):
+        """Mettre à jour les paramètres du réseau de valeurs en utilisant un batch d'expériences."""
         states, actions, rewards, next_states, dones, indices, weights = experiences
 
-
+        # Double DQN avec n-step returns
         next_actions = self.qnetwork_local(next_states).detach().max(1)[1].unsqueeze(1)
         Q_targets_next = self.qnetwork_target(next_states).detach().gather(1, next_actions)
 
-        # Calcul des Q-values cibles avec clipping des rewards
+        # Utiliser n_step_gamma au lieu de gamma simple
         rewards = torch.clamp(rewards, -1, 1)
-        Q_targets = rewards + (gamma * Q_targets_next * (1 - dones))
-
-        # Q-values courantes
+        Q_targets = rewards + (n_step_gamma * Q_targets_next * (1 - dones))
         Q_expected = self.qnetwork_local(states).gather(1, actions)
 
         # Calcul de la perte avec importance sampling

@@ -1,0 +1,30 @@
+Environement :
+
+Utilisation de l'appareil: cuda:0
+Utilisation de l'appareil: cuda:0
+Entraînement d'un agent DQN pour le collecteur de nourriture
+Démarrage de l'environnement Unity: ../FoodCollectorOneAgent/FoodCollector.exe
+Utilisation de l'appareil: cuda
+Behavior name: GridFoodCollector?team=0
+Ce script est conçu pour des actions discrètes, mais l'environnement utilise des actions continues.
+Actions continues: 3
+Actions discrètes: (2,)
+Discrétisation des actions continues en 27 actions discrètes
+Taille de l'état: 8000, Taille de l'action: 27
+Utilisation de l'agent DQN standard
+Début de l'entraînement...
+
+-------------------------------------------------------
+New DQN :
+Épisode 100     Score moyen: 1.42core moyen: 1.422
+Épisode 200     Score moyen: 10.22ore moyen: 10.22
+Épisode 241     Score: 26.00    Score moyen: 15.04
+Environnement résolu en 241 épisodes!   Score moyen: 15.04
+Temps d'exécution: 46 minutes 6 secondes
+-------------------------------------------------------
+
+Épisode 100     Score moyen: 3.73core moyen: 3.736
+Épisode 195     Score: 24.00    Score moyen: 17.09
+Environnement résolu en 195 épisodes!   Score moyen: 17.09
+Temps d'exécution: 35 minutes 42 secondes
+

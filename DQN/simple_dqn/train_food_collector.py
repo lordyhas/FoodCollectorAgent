@@ -22,7 +22,7 @@ MAX_STEPS = 1000  # Nombre maximal d'étapes par épisode
 EPS_START = 1.0  # Valeur initiale d'epsilon
 EPS_END = 0.01  # Valeur minimale d'epsilon
 EPS_DECAY = 0.995  # Facteur de décroissance d'epsilon
-TARGET_SCORE = 15  # Score moyen à atteindre pour considérer l'environnement résolu
+TARGET_SCORE = 17  # Score moyen à atteindre pour considérer l'environnement résolu
 TIME_SCALE = 10.0  # Vitesse de simulation (5x est plus stable que 20x)
 
 
@@ -314,7 +314,7 @@ def train_dqn(env_path, network_type='dqn', num_episodes=NUM_EPISODES, max_steps
     return scores, losses
 
 
-def plot_scores(scores, losses=None, network_type='dqn'):
+def plot_scores(scores, losses=None, network_type='dqn' , suffix=""):
     """Affiche un graphique des scores et optionnellement des pertes pendant l'entraînement.
 
     Params
@@ -339,7 +339,7 @@ def plot_scores(scores, losses=None, network_type='dqn'):
 
     # Créer une figure pour les scores
     plt.figure(figsize=(10, 6))
-    plt.plot(np.arange(len(scores)), scores)
+    plt.plot(np.arange(len(scores)), scores, label='Score')
     plt.ylabel('Score')
     plt.xlabel('Épisode')
     plt.title(f'Scores pendant l\'entraînement {title_prefix}')
@@ -348,15 +348,18 @@ def plot_scores(scores, losses=None, network_type='dqn'):
     window_size = min(100, len(scores))
     if window_size > 0:
         moving_avg = np.convolve(scores, np.ones((window_size,)) / window_size, mode='valid')
-        plt.plot(np.arange(len(moving_avg)), moving_avg, color='red')
+        plt.plot(np.arange(len(moving_avg)), moving_avg, color='red', label='Moyenne (100 épisodes)')
+    # Add horizontal line for target
+    plt.axhline(y=TARGET_SCORE, color='green', linestyle='--', alpha=0.3, label='Objectif')
+    plt.legend()
 
-    plt.savefig(f'figures/{network_type}_scores_plot_{timestamp}.png')
+    plt.savefig(f'figures/{network_type}_scores_plot_{timestamp}--{suffix}.png')
     plt.show()
 
     # Si des pertes sont disponibles, les tracer aussi
     if losses is not None and len(losses) > 0:
         plt.figure(figsize=(10, 6))
-        plt.plot(np.arange(len(losses)), losses)
+        plt.plot(np.arange(len(losses)), losses, label='Loss')
         plt.ylabel('Loss')
         plt.xlabel('Épisode')
         plt.title(f'Pertes pendant l\'entraînement {title_prefix}')
@@ -365,9 +368,10 @@ def plot_scores(scores, losses=None, network_type='dqn'):
         window_size = min(100, len(losses))
         if window_size > 0:
             moving_avg_loss = np.convolve(losses, np.ones((window_size,)) / window_size, mode='valid')
-            plt.plot(np.arange(len(moving_avg_loss)), moving_avg_loss, color='red')
+            plt.plot(np.arange(len(moving_avg_loss)), moving_avg_loss, color='red', label='Moyenne (100 épisodes)')
 
-        plt.savefig(f'figures/{network_type}_loss_plot_{timestamp}.png')
+        plt.legend()
+        plt.savefig(f'figures/{network_type}_loss_plot_{timestamp}--{suffix}.png')
         plt.show()
 
 
@@ -378,6 +382,7 @@ if __name__ == "__main__":
 
     # Type de réseau à utiliser ('dqn', 'gru' ou 'lstm')
     network_type = 'dqn'  # Changer pour 'gru' ou 'lstm'
+    suffix = "v3.1"
 
     print(f"Entraînement d'un agent {network_type.upper()} pour le collecteur de nourriture")
 
@@ -387,10 +392,8 @@ if __name__ == "__main__":
         network_type=network_type,
         num_episodes=1000,
         time_scale=20.0,
-        suffix="v3"
+        suffix=suffix
     )
-
-    # Afficher les résultats
 
     end_time = time.time()
     execution_time = end_time - start_time
@@ -407,5 +410,5 @@ if __name__ == "__main__":
     else:
         print(f"Temps d'exécution: {execution_time:.2f} secondes")
 
-    plot_scores(scores, losses, network_type)
+    plot_scores(scores, losses, network_type, suffix)
 
