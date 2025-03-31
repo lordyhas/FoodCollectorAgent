@@ -271,15 +271,16 @@ if __name__ == "__main__":
 
     #model_path = "checkpoints/model_final-15m.pth"
     #model_path = "checkpoints/checkpoint_episode_700-gru.pth"
-    model_path = "checkpoints-finetune/finetuned_dqn_20250322-213144_final.pth"
+    #model_path = "checkpoints-finetune/finetuned_dqn_20250322-213144_final.pth"
+    model_path = "checkpoints/dqn_model_final_20250329-020617-v3.1.pth"
 
     # Spécifier le type de réseau (dqn ou gru) en fonction du modèle utilisé pour l'entraînement
-    network_type = 'gru'  # 'dqn' pour un modèle DQN standard
+    network_type = 'dqn'  # 'dqn' pour un modèle DQN standard
 
     scores = evaluate_model(
         env_path=env_path,
         model_path=model_path,
         network_type=network_type,
-        num_episodes=5,
+        num_episodes=2,
         render=True
     )
