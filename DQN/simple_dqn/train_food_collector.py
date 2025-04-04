@@ -381,7 +381,7 @@ if __name__ == "__main__":
     start_time = time.time()
 
     # Type de réseau à utiliser ('dqn', 'gru' ou 'lstm')
-    network_type = 'dqn'  # Changer pour 'gru' ou 'lstm'
+    network_type = 'lstm'  # Changer pour 'gru' ou 'lstm'
     suffix = "v3.1"
 
     print(f"Entraînement d'un agent {network_type.upper()} pour le collecteur de nourriture")
